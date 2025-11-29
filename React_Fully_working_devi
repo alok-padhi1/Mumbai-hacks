@@ -1,0 +1,867 @@
+import React, { useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
+
+export default function Devi() {
+  const [view, setView] = useState("home");
+  const [entries, setEntries] = useState({});
+  const [showModal, setShowModal] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [month, setMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [expandedBlog, setExpandedBlog] = useState(null);
+
+  const defaultForm = {
+    isPeriod: false,
+    flow: "",
+    bloodColor: "",
+    collectionMethod: [],
+    cervicalMucus: "",
+    basalTemp: "",
+    ovulationTest: "",
+    discharge: false,
+    dischargeColor: "",
+    dischargeOdor: false,
+    breastTender: false,
+    breastSymptoms: [],
+    pain: 0,
+    painAreas: [],
+    symptoms: [],
+    hotFlashes: false,
+    hotFlashCount: "",
+    mood: [],
+    stress: 5,
+    focus: 5,
+    mentalClarity: "",
+    sleep: 5,
+    sleepType: "",
+    wakeTired: false,
+    nightSweats: false,
+    dreams: "",
+    energy: 5,
+    exercise: false,
+    exerciseType: [],
+    appetite: "",
+    cravings: [],
+    waterIntake: "",
+    caffeineIntake: "",
+    digestion: "",
+    bowelMovement: "",
+    skin: "",
+    hair: "",
+    inflammation: [],
+    sexActivity: false,
+    sexDrive: "",
+    protection: "",
+    sexPain: false,
+    vaginalHealth: [],
+    urinarySymptoms: [],
+    medicalTests: "",
+    ailments: [],
+    screenTime: "",
+    steps: "",
+    supplements: [],
+    medications: "",
+    notes: "",
+    date: ""
+  };
+
+  const [form, setForm] = useState(defaultForm);
+
+  const dateKey = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return ${yyyy}-${mm}-${dd};
+  };
+
+  const toggle = (arr = [], item) =>
+    arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item];
+
+  const entriesListSortedAsc = useMemo(() => {
+    return Object.entries(entries)
+      .map(([k, v]) => ({ date: k, ...v }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [entries]);
+
+  const phase = useMemo(() => {
+    const periods = entriesListSortedAsc
+      .filter((e) => e.isPeriod)
+      .map((e) => new Date(e.date))
+      .sort((a, b) => b - a);
+
+    if (!periods.length)
+      return {
+        name: "Unknown",
+        day: 0,
+        emoji: "❓",
+        color: "#9ca3af",
+        tip: "Log your period to start tracking"
+      };
+
+    const diffDays = Math.floor((new Date() - periods[0]) / 86400000);
+    if (diffDays <= 5)
+      return {
+        name: "Menstrual",
+        day: diffDays + 1,
+        emoji: "🩸",
+        color: "#ef4444",
+        tip: "Rest & gentle movement"
+      };
+    if (diffDays <= 13)
+      return {
+        name: "Follicular",
+        day: diffDays + 1,
+        emoji: "🌱",
+        color: "#22c55e",
+        tip: "High energy for workouts"
+      };
+    if (diffDays <= 16)
+      return {
+        name: "Ovulation",
+        day: diffDays + 1,
+        emoji: "✨",
+        color: "#eab308",
+        tip: "Peak fertility window"
+      };
+    if (diffDays <= 28)
+      return {
+        name: "Luteal",
+        day: diffDays + 1,
+        emoji: "🌙",
+        color: "#8b5cf6",
+        tip: "Self-care & rest"
+      };
+    return {
+      name: "Late Cycle",
+      day: diffDays + 1,
+      emoji: "⏰",
+      color: "#f97316",
+      tip: "Period may arrive soon"
+    };
+  }, [entriesListSortedAsc]);
+
+  const nextP = useMemo(() => {
+    const periods = entriesListSortedAsc
+      .filter((e) => e.isPeriod)
+      .map((e) => new Date(e.date))
+      .sort((a, b) => a - b);
+    if (periods.length < 2) return null;
+    let total = 0;
+    for (let i = 1; i < periods.length; i++) {
+      total += Math.round((periods[i] - periods[i - 1]) / 86400000);
+    }
+    const avg = Math.round(total / (periods.length - 1)) || 28;
+    const last = new Date(periods[periods.length - 1]);
+    const predicted = new Date(last);
+    predicted.setDate(predicted.getDate() + avg);
+    return {
+      avg,
+      days: Math.max(0, Math.round((predicted - new Date()) / 86400000))
+    };
+  }, [entriesListSortedAsc]);
+
+  const count = Object.keys(entries).length;
+
+  const saveEntry = () => {
+    const key = dateKey(selectedDate);
+    const toSave = { ...form, date: key };
+    const newData = { ...entries, [key]: toSave };
+    setEntries(newData);
+    setShowModal(false);
+    alert("✓ Entry saved successfully!");
+  };
+
+  const generateInsights = async () => {
+    if (Object.keys(entries).length < 3) {
+      alert("Please log at least 3 days of data for AI insights");
+      return;
+    }
+
+    setLoading(true);
+    setInsights(null);
+
+    const recentEntries = entriesListSortedAsc.slice(-30);
+    const recentData = recentEntries
+      .map(
+        (e) =>
+          ${e.date}: Period=${e.isPeriod || false}, Flow=${e.flow || "none"}, Pain=${e.pain || 0}, Mood=${(e.mood || []).join(",") || "none"}, Sleep=${e.sleep || 0}, Energy=${e.energy || 0}, Symptoms=${(e.symptoms || []).join(",") || "none"}, Discharge=${e.discharge ? "yes" : "no"}, HotFlashes=${e.hotFlashes ? "yes" : "no"}, Digestion=${e.digestion || "normal"}, MentalClarity=${e.mentalClarity || "normal"}, VaginalHealth=${(e.vaginalHealth || []).join(",") || "normal"}
+      )
+      .join("\n");
+
+    const payload = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      messages: [
+        {
+          role: "user",
+          content: `You are Devi, an AI women's health assistant with Ayurvedic wisdom. Analyze this data:
+
+Current Phase: ${phase.name} (Day ${phase.day})
+Next Period: ${nextP?.days ?? "calculating"} days
+Cycle Length: ${nextP?.avg ?? 28} days
+
+Recent Health Data:
+${recentData}
+
+Provide a JSON response:
+{
+  "greeting": "Warm personalized greeting",
+  "cycle": "Brief cycle analysis",
+  "ayurveda": "Ayurvedic advice for ${phase.name} phase",
+  "exercise": "Exercise recommendations",
+  "nutrition": "Foods to eat now",
+  "herbs": "Beneficial herbs/teas",
+  "yoga": "Recommended yoga poses",
+  "alert": "Any health concerns or empty string"
+}
+Respond with ONLY valid JSON.`
+        }
+      ]
+    };
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      let text = "";
+      
+      if (data?.content && Array.isArray(data.content) && data.content[0]?.text) {
+        text = data.content[0].text;
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setInsights({ ...parsed, phase, nextP });
+        } catch (e) {
+          setInsights(getFallbackInsights());
+        }
+      } else {
+        setInsights(getFallbackInsights());
+      }
+    } catch (e) {
+      setInsights(getFallbackInsights());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFallbackInsights = () => ({
+    greeting: "Namaste! 🙏",
+    cycle: You're in your ${phase.name} phase (Day ${phase.day}).,
+    ayurveda: getDefaultAyurveda(phase.name),
+    exercise: "Listen to your body and adjust activity levels.",
+    nutrition: "Focus on whole foods and balanced meals.",
+    herbs: "Try ginger tea for warmth and turmeric for inflammation.",
+    yoga: "Practice gentle stretches and breathing exercises.",
+    alert: "",
+    phase,
+    nextP
+  });
+
+  const getDefaultAyurveda = (phaseName) => {
+    const tips = {
+      Menstrual: "Rest is crucial during this Vata-dominant phase. Eat warm, grounding foods like soups and stews.",
+      Follicular: "Kapha energy builds now - perfect for new projects! Enjoy light meals, sprouts, and energizing yoga.",
+      Ovulation: "Peak Pitta phase - embrace your high energy! Eat cooling foods and practice hip-opening poses.",
+      Luteal: "Balance Vata-Pitta with grounding practices. Choose warm, nourishing foods and restorative yoga."
+    };
+    return tips[phaseName] || "Listen to your body and practice self-care.";
+  };
+
+  const Btn = ({ options, value, onChange, multi }) => (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+      {options.map((o) => {
+        const selected = multi ? (value || []).includes(o) : value === o;
+        return (
+          <button
+            key={o}
+            onClick={() => onChange(multi ? toggle(value || [], o) : o)}
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              borderRadius: "10px",
+              border: "1px solid",
+              background: selected ? "linear-gradient(135deg,#ec4899,#8b5cf6)" : "white",
+              color: selected ? "white" : "#374151",
+              borderColor: selected ? "transparent" : "#e5e7eb",
+              cursor: "pointer",
+              fontWeight: 600
+            }}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const Section = ({ title, children, bg = "#f9fafb" }) => (
+    <div style={{ background: bg, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+      <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 13 }}>{title}</p>
+      {children}
+    </div>
+  );
+
+  const renderCal = () => {
+    const y = month.getFullYear(),
+      m = month.getMonth();
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    const cells = [];
+
+    for (let i = 0; i < first; i++) cells.push(<div key={empty-${i}} style={{ height: 40 }} />);
+
+    for (let d = 1; d <= days; d++) {
+      const date = new Date(y, m, d);
+      const key = dateKey(date);
+      const entry = entries[key];
+      const isToday = key === dateKey(new Date());
+
+      cells.push(
+        <div
+          key={d}
+          onClick={() => {
+            setSelectedDate(date);
+            setForm(entry ? { ...defaultForm, ...entry } : { ...defaultForm, date: key });
+            setShowModal(true);
+          }}
+          style={{
+            height: 64,
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            padding: 6,
+            cursor: "pointer",
+            background: isToday ? "#fff7fb" : "white",
+            boxShadow: isToday ? "0 0 0 2px rgba(236,72,153,0.12)" : "none",
+            fontSize: 12,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}
+        >
+          <div style={{ fontWeight: 700 }}>{d}</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {entry?.isPeriod && <span style={{ fontSize: 10, color: "#ef4444" }}>●</span>}
+            {(entry?.mood?.length || 0) > 0 && <span style={{ fontSize: 10, color: "#eab308" }}>●</span>}
+            {entry?.exercise && <span style={{ fontSize: 10, color: "#22c55e" }}>●</span>}
+            {entry?.hotFlashes && <span style={{ fontSize: 10, color: "#f97316" }}>🔥</span>}
+            {entry?.discharge && <span style={{ fontSize: 10, color: "#06b6d4" }}>💧</span>}
+          </div>
+        </div>
+      );
+    }
+    return cells;
+  };
+
+  const ayurvedaTips = [
+    { phase: "Menstrual", dosha: "Vata", foods: "Warm soups, ghee, dates", avoid: "Cold/raw foods", herbs: "Ashoka, Ginger", yoga: "Gentle stretches" },
+    { phase: "Follicular", dosha: "Kapha", foods: "Light meals, sprouts, greens", avoid: "Heavy/oily foods", herbs: "Turmeric, Green tea", yoga: "Sun Salutations" },
+    { phase: "Ovulation", dosha: "Pitta", foods: "Cooling foods, coconut", avoid: "Spicy foods", herbs: "Aloe, Rose water", yoga: "Hip openers" },
+    { phase: "Luteal", dosha: "Vata-Pitta", foods: "Root vegetables, nuts", avoid: "Sugar, alcohol", herbs: "Ashwagandha", yoga: "Restorative" }
+  ];
+
+  const blogs = [
+    { id: 1, title: "🌿 Ayurveda & Your Cycle", content: "Ayurveda views menstruation as natural cleansing. During your period, Apana Vata dominates - rest is crucial. Follicular phase builds Kapha energy. Ovulation is Pitta-dominant with peak energy. Luteal phase needs Vata balancing.", color: "#22c55e" },
+    { id: 2, title: "🩸 Understanding Flow", content: "Bright red = fresh healthy blood. Dark/brown = older blood (normal at start/end). Very heavy or very light may indicate imbalances. Small clots are normal. Track your unique pattern.", color: "#ef4444" },
+    { id: 3, title: "🥗 Fertility Nutrition", content: "Iron-rich foods (spinach, lentils) replenish blood. Omega-3s (salmon, walnuts) reduce inflammation. Folate (greens) supports fertility. Zinc (pumpkin seeds) helps hormones.", color: "#f97316" },
+    { id: 4, title: "🧘 Cycle Yoga", content: "MENSTRUAL: Gentle stretches, avoid inversions. FOLLICULAR: Energizing flows, build strength. OVULATION: Peak performance, hip openers. LUTEAL: Restorative poses, calming breath.", color: "#8b5cf6" },
+    { id: 5, title: "💡 Comprehensive Tracking", content: "Track discharge color/odor, vaginal health, hot flashes, urinary symptoms, hair/skin changes, digestion, and mental clarity. These patterns reveal hormonal shifts and help identify potential health issues early. Share detailed logs with your healthcare provider for better diagnosis.", color: "#06b6d4" }
+  ];
+
+  const currentAyurveda = ayurvedaTips.find((a) => a.phase === phase.name) || ayurvedaTips[0];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#fdf2f8,#f3e8ff)", padding: 16, fontFamily: "system-ui, sans-serif", paddingBottom: 80 }}>
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 24, fontWeight: "bold", background: "linear-gradient(135deg,#ec4899,#8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", margin: 0 }}>
+          🌸 Devi
+        </h1>
+        <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0 0 0" }}>Your Ayurvedic Health Companion</p>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+        {["home", "calendar", "insights", "learn"].map((v) => (
+          <button
+            key={v}
+            onClick={() => {
+              setView(v);
+              if (v === "insights" && !insights) generateInsights();
+            }}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 20,
+              border: "none",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: view === v ? "linear-gradient(135deg,#ec4899,#8b5cf6)" : "white",
+              color: view === v ? "white" : "#374151",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.06)"
+            }}
+          >
+            {v.charAt(0).toUpperCase() + v.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxWidth: 520, margin: "0 auto" }}>
+        {view === "home" && (
+          <div>
+            <div style={{ background: "white", borderRadius: 16, padding: 14, marginBottom: 12, boxShadow: "0 6px 18px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 60, height: 60, borderRadius: "50%", background: ${phase.color}22, border: 2px solid ${phase.color}, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
+                  {phase.emoji}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{phase.name} Phase</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0" }}>Day {phase.day} • {phase.tip}</p>
+                  <p style={{ fontSize: 12, color: "#9333ea", margin: 0 }}>{nextP ? Next period in ~${nextP.days} days : "Log periods to predict"}</p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <div style={{ background: "white", borderRadius: 12, padding: 10, textAlign: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
+                <p style={{ fontSize: 20, fontWeight: 800, color: "#ec4899", margin: 0 }}>{count}</p>
+                <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Entries</p>
+              </div>
+              <div style={{ background: "white", borderRadius: 12, padding: 10, textAlign: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
+                <p style={{ fontSize: 20, fontWeight: 800, color: "#8b5cf6", margin: 0 }}>{nextP?.avg || "28"}</p>
+                <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Cycle</p>
+              </div>
+              <div style={{ background: "white", borderRadius: 12, padding: 10, textAlign: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
+                <p style={{ fontSize: 20, fontWeight: 800, color: "#22c55e", margin: 0 }}>{phase.day}</p>
+                <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Day</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                const today = new Date();
+                setSelectedDate(today);
+                setForm({ ...defaultForm, date: dateKey(today) });
+                setShowModal(true);
+              }}
+              style={{
+                width: "100%",
+                padding: 14,
+                borderRadius: 12,
+                border: "none",
+                background: "linear-gradient(135deg,#ec4899,#f472b6)",
+                color: "white",
+                fontWeight: 800,
+                fontSize: 14,
+                cursor: "pointer",
+                marginBottom: 8,
+                boxShadow: "0 6px 12px rgba(236,72,153,0.16)"
+              }}
+            >
+              + Log Today's Health
+            </button>
+
+            <div style={{ background: "#e0f2fe", borderRadius: 8, padding: 8, marginBottom: 12, border: "1px solid #bae6fd" }}>
+              <p style={{ fontSize: 11, color: "#0c4a6e", margin: 0, textAlign: "center" }}>
+                💡 Track 20+ health markers including discharge, hot flashes, digestion, hair & more
+              </p>
+            </div>
+
+            <div style={{ background: "linear-gradient(135deg,#ecfdf5,#d1fae5)", borderRadius: 12, padding: 12, marginBottom: 12, border: "1px solid #a7f3d0" }}>
+              <p style={{ fontWeight: 800, color: "#065f46", marginBottom: 6, fontSize: 13 }}>🌿 Ayurveda for {phase.name} Phase</p>
+              <p style={{ fontSize: 12, color: "#047857", margin: "4px 0" }}><strong>Dosha:</strong> {currentAyurveda.dosha}</p>
+              <p style={{ fontSize: 12, color: "#047857", margin: "4px 0" }}><strong>Eat:</strong> {currentAyurveda.foods}</p>
+              <p style={{ fontSize: 12, color: "#047857", margin: "4px 0" }}><strong>Herbs:</strong> {currentAyurveda.herbs}</p>
+              <p style={{ fontSize: 12, color: "#047857", margin: "4px 0" }}><strong>Yoga:</strong> {currentAyurveda.yoga}</p>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontWeight: 800, marginBottom: 8, fontSize: 13 }}>📚 Quick Reads</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {blogs.map((blog) => (
+                  <div
+                    key={blog.id}
+                    onClick={() => setExpandedBlog(blog)}
+                    style={{ background: "white", borderRadius: 10, padding: 10, cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.04)", borderLeft: 4px solid ${blog.color} }}
+                  >
+                    <p style={{ fontWeight: 700, fontSize: 12, margin: 0 }}>{blog.title}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === "calendar" && (
+          <div style={{ background: "white", borderRadius: 16, padding: 14, boxShadow: "0 6px 18px rgba(0,0,0,0.06)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1))} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>◀</button>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+              <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1))} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>▶</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6, marginBottom: 6 }}>
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                <div key={i} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#9ca3af" }}>{d}</div>
+              ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 }}>{renderCal()}</div>
+
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "center", gap: 12, fontSize: 12, flexWrap: "wrap" }}>
+              <span><span style={{ color: "#ef4444" }}>●</span> Period</span>
+              <span><span style={{ color: "#eab308" }}>●</span> Mood</span>
+              <span><span style={{ color: "#22c55e" }}>●</span> Exercise</span>
+              <span>🔥 Hot flashes</span>
+              <span>💧 Discharge</span>
+            </div>
+          </div>
+        )}
+
+        {view === "insights" && (
+          <div>
+            {loading ? (
+              <div style={{ background: "white", borderRadius: 16, padding: 40, textAlign: "center" }}>
+                <div style={{ width: 48, height: 48, border: "4px solid #ec4899", borderTopColor: "transparent", borderRadius: "50%", margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
+                <p style={{ fontSize: 13 }}>Analyzing with AI + Ayurveda...</p>
+                <style>{@keyframes spin { to { transform: rotate(360deg); } }}</style>
+              </div>
+            ) : insights ? (
+              <div>
+                {insights.greeting && (
+                  <div style={{ background: "linear-gradient(135deg,#fdf2f8,#fce7f3)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                    <p style={{ fontWeight: 800, color: "#be185d", fontSize: 13, margin: 0 }}>💜 {insights.greeting}</p>
+                  </div>
+                )}
+
+                <div style={{ background: "white", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                  <p style={{ fontWeight: 800, color: "#7c3aed", marginBottom: 6, fontSize: 13 }}>📊 Your Cycle</p>
+                  <p style={{ fontSize: 12, marginBottom: 4 }}>Phase: {insights.phase?.name || phase.name} (Day {insights.phase?.day || phase.day})</p>
+                  <p style={{ fontSize: 12 }}>Next Period: ~{insights.nextP?.days ?? nextP?.days ?? "?"} days</p>
+                </div>
+
+                {insights.cycle && (
+                  <div style={{ background: "white", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                    <p style={{ fontWeight: 800, color: "#2563eb", marginBottom: 6, fontSize: 13 }}>📈 Analysis</p>
+                    <p style={{ fontSize: 12 }}>{insights.cycle}</p>
+                  </div>
+                )}
+
+                {insights.ayurveda && (
+                  <div style={{ background: "#ecfdf5", borderRadius: 12, padding: 12, marginBottom: 10, border: "1px solid #a7f3d0" }}>
+                    <p style={{ fontWeight: 800, color: "#065f46", marginBottom: 6, fontSize: 13 }}>🌿 Ayurveda</p>
+                    <p style={{ fontSize: 12 }}>{insights.ayurveda}</p>
+                  </div>
+                )}
+
+                {insights.nutrition && (
+                  <div style={{ background: "#ffedd5", borderRadius: 12, padding: 12, marginBottom: 10, border: "1px solid #fdba74" }}>
+                    <p style={{ fontWeight: 800, color: "#9a3412", marginBottom: 6, fontSize: 13 }}>🍎 Nutrition</p>
+                    <p style={{ fontSize: 12 }}>{insights.nutrition}</p>
+                  </div>
+                )}
+
+                {insights.herbs && (
+                  <div style={{ background: "#fef3c7", borderRadius: 12, padding: 12, marginBottom: 10, border: "1px solid #fcd34d" }}>
+                    <p style={{ fontWeight: 800, color: "#92400e", marginBottom: 6, fontSize: 13 }}>🍵 Herbs</p>
+                    <p style={{ fontSize: 12 }}>{insights.herbs}</p>
+                  </div>
+                )}
+
+                {insights.yoga && (
+                  <div style={{ background: "#ede9fe", borderRadius: 12, padding: 12, marginBottom: 10, border: "1px solid #c4b5fd" }}>
+                    <p style={{ fontWeight: 800, color: "#5b21b6", marginBottom: 6, fontSize: 13 }}>🧘 Yoga</p>
+                    <p style={{ fontSize: 12 }}>{insights.yoga}</p>
+                  </div>
+                )}
+
+                {insights.exercise && (
+                  <div style={{ background: "#dcfce7", borderRadius: 12, padding: 12, marginBottom: 10, border: "1px solid #86efac" }}>
+                    <p style={{ fontWeight: 800, color: "#166534", marginBottom: 6, fontSize: 13 }}>🏃 Exercise</p>
+                    <p style={{ fontSize: 12 }}>{insights.exercise}</p>
+                  </div>
+                )}
+
+                {insights.alert && (
+                  <div style={{ background: "#fee2e2", borderRadius: 12, padding: 12, marginBottom: 10, border: "2px solid #fca5a5" }}>
+                    <p style={{ fontWeight: 800, color: "#991b1b", marginBottom: 6, fontSize: 13 }}>⚠ Alert</p>
+                    <p style={{ fontSize: 12 }}>{insights.alert}</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={generateInsights}
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "none",
+                    background: "linear-gradient(135deg,#ec4899,#8b5cf6)",
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: "pointer"
+                  }}
+                >
+                  Refresh Insights
+                </button>
+              </div>
+            ) : (
+              <div style={{ background: "white", borderRadius: 16, padding: 40, textAlign: "center" }}>
+                <Sparkles style={{ width: 48, height: 48, margin: "0 auto 12px", color: "#ec4899" }} />
+                <p style={{ marginBottom: 12, fontSize: 13 }}>Get personalized AI insights</p>
+                <button
+                  onClick={generateInsights}
+                  disabled={count < 3}
+                  style={{
+                    padding: "12px 24px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: count < 3 ? "#d1d5db" : "linear-gradient(135deg,#ec4899,#8b5cf6)",
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: count < 3 ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Generate Insights
+                </button>
+                {count < 3 && <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>Need {3 - count} more entries</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "learn" && (
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>📚 Health Library</p>
+
+            {blogs.map((blog) => (
+              <div
+                key={blog.id}
+                onClick={() => setExpandedBlog(expandedBlog?.id === blog.id ? null : blog)}
+                style={{ background: "white", borderRadius: 12, padding: 12, marginBottom: 8, cursor: "pointer", borderLeft: 4px solid ${blog.color} }}
+              >
+                <p style={{ fontWeight: 800, fontSize: 13, margin: 0 }}>{blog.title}</p>
+                {expandedBlog?.id === blog.id && <p style={{ fontSize: 12, color: "#374151", marginTop: 8, lineHeight: 1.5 }}>{blog.content}</p>}
+              </div>
+            ))}
+
+            <div style={{ background: "linear-gradient(135deg,#ecfdf5,#d1fae5)", borderRadius: 12, padding: 12, marginTop: 12, border: "1px solid #a7f3d0" }}>
+              <p style={{ fontWeight: 800, fontSize: 13, marginBottom: 10, color: "#065f46" }}>🌿 Ayurveda Cycle Guide</p>
+              {ayurvedaTips.map((tip, i) => (
+                <div key={i} style={{ background: "white", borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                  <p style={{ fontWeight: 800, fontSize: 12, margin: "0 0 6px 0" }}>{tip.phase} ({tip.dosha})</p>
+                  <p style={{ fontSize: 11, margin: "2px 0" }}>✓ {tip.foods}</p>
+                  <p style={{ fontSize: 11, margin: "2px 0" }}>✗ {tip.avoid}</p>
+                  <p style={{ fontSize: 11, margin: "2px 0" }}>🌿 {tip.herbs}</p>
+                  <p style={{ fontSize: 11, margin: "2px 0" }}>🧘 {tip.yoga}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, overflowY: "auto", padding: 20 }}
+        >
+          <div style={{ background: "white", borderRadius: 16, maxWidth: 520, margin: "0 auto", position: "relative" }}>
+            <div style={{ background: "linear-gradient(135deg,#ec4899,#8b5cf6)", padding: 14, borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "white", fontWeight: 800, fontSize: 14 }}>
+                📝 {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "white", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: 14, maxHeight: "70vh", overflowY: "auto" }}>
+              <Section title="🩸 Period" bg="#fdf2f8">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={form.isPeriod} onChange={(e) => setForm({ ...form, isPeriod: e.target.checked })} />
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>Period Today</span>
+                </label>
+                {form.isPeriod && (
+                  <>
+                    <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Flow:</p>
+                    <Btn options={["Light", "Medium", "Heavy", "Spotting"]} value={form.flow} onChange={(v) => setForm({ ...form, flow: v })} />
+                    <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Color:</p>
+                    <Btn options={["Bright Red", "Dark Red", "Brown", "Pink"]} value={form.bloodColor} onChange={(v) => setForm({ ...form, bloodColor: v })} />
+                    <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Collection method:</p>
+                    <Btn options={["Pad", "Tampon", "Cup", "Disc", "Period underwear"]} value={form.collectionMethod} onChange={(v) => setForm({ ...form, collectionMethod: v })} multi />
+                  </>
+                )}
+              </Section>
+
+              <Section title="🌱 Fertility" bg="#f0f9ff">
+                <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Cervical mucus:</p>
+                <Btn options={["Dry", "Sticky", "Creamy", "Egg-white"]} value={form.cervicalMucus} onChange={(v) => setForm({ ...form, cervicalMucus: v })} />
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Basal temp (°C):</p>
+                <input type="text" placeholder="e.g. 36.6" value={form.basalTemp} onChange={(e) => setForm({ ...form, basalTemp: e.target.value })} style={{ width: "100%", padding: 8, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13 }} />
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Ovulation test:</p>
+                <Btn options={["Positive", "Negative", "Not taken"]} value={form.ovulationTest} onChange={(v) => setForm({ ...form, ovulationTest: v })} />
+              </Section>
+
+              <Section title="💧 Discharge & Vaginal Health" bg="#fef3c7">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={form.discharge} onChange={(e) => setForm({ ...form, discharge: e.target.checked })} />
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>Unusual discharge</span>
+                </label>
+                {form.discharge && (
+                  <>
+                    <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Color:</p>
+                    <Btn options={["Clear", "White", "Yellow", "Green", "Gray"]} value={form.dischargeColor} onChange={(v) => setForm({ ...form, dischargeColor: v })} />
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <input type="checkbox" checked={form.dischargeOdor} onChange={(e) => setForm({ ...form, dischargeOdor: e.target.checked })} />
+                      <span style={{ fontSize: 12 }}>Strong/unusual odor</span>
+                    </label>
+                  </>
+                )}
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Symptoms:</p>
+                <Btn options={["Itching", "Burning", "Dryness", "Irritation", "None"]} value={form.vaginalHealth} onChange={(v) => setForm({ ...form, vaginalHealth: v })} multi />
+              </Section>
+
+              <Section title="🩺 Breast & Chest" bg="#fce7f3">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={form.breastTender} onChange={(e) => setForm({ ...form, breastTender: e.target.checked })} />
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>Breast tenderness</span>
+                </label>
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Other symptoms:</p>
+                <Btn options={["Swelling", "Lumps", "Pain", "Nipple discharge", "None"]} value={form.breastSymptoms} onChange={(v) => setForm({ ...form, breastSymptoms: v })} multi />
+              </Section>
+
+              <Section title={⚠ Pain: ${form.pain}/10} bg="#fff7ed">
+                <input type="range" min="0" max="10" value={form.pain} onChange={(e) => setForm({ ...form, pain: parseInt(e.target.value || "0") })} style={{ width: "100%" }} />
+                {form.pain > 0 && (
+                  <>
+                    <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Where?</p>
+                    <Btn options={["Abdomen", "Back", "Head", "Breasts"]} value={form.painAreas} onChange={(v) => setForm({ ...form, painAreas: v })} multi />
+                  </>
+                )}
+              </Section>
+
+              <Section title="🏥 Symptoms" bg="#f5f3ff">
+                <Btn options={["Cramps", "Bloating", "Headache", "Fatigue", "Acne", "Nausea"]} value={form.symptoms} onChange={(v) => setForm({ ...form, symptoms: v })} multi />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <input type="checkbox" checked={form.hotFlashes} onChange={(e) => setForm({ ...form, hotFlashes: e.target.checked })} />
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>Hot flashes/night sweats</span>
+                </label>
+                {form.hotFlashes && (
+                  <>
+                    <p style={{ fontSize: 12, margin: "6px 0 4px" }}>How many times today?</p>
+                    <input type="text" placeholder="e.g. 3" value={form.hotFlashCount} onChange={(e) => setForm({ ...form, hotFlashCount: e.target.value })} style={{ width: "100%", padding: 8, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13 }} />
+                  </>
+                )}
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Urinary:</p>
+                <Btn options={["Frequent urination", "Urgency", "Pain/burning", "Leakage", "None"]} value={form.urinarySymptoms} onChange={(v) => setForm({ ...form, urinarySymptoms: v })} multi />
+              </Section>
+
+              <Section title="😊 Mood & Mind" bg="#fefce8">
+                <Btn options={["Happy", "Sad", "Anxious", "Calm", "Irritable", "Tired"]} value={form.mood} onChange={(v) => setForm({ ...form, mood: v })} multi />
+                <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Stress: {form.stress}/10</p>
+                <input type="range" min="0" max="10" value={form.stress} onChange={(e) => setForm({ ...form, stress: parseInt(e.target.value || "0") })} style={{ width: "100%" }} />
+                <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Mental clarity:</p>
+                <Btn options={["Clear", "Brain fog", "Scattered", "Sharp"]} value={form.mentalClarity} onChange={(v) => setForm({ ...form, mentalClarity: v })} />
+              </Section>
+
+              <Section title={🌙 Sleep: ${form.sleep}/10} bg="#eef2ff">
+                <input type="range" min="0" max="10" value={form.sleep} onChange={(e) => setForm({ ...form, sleep: parseInt(e.target.value || "0") })} style={{ width: "100%" }} />
+                <p style={{ fontSize: 12, margin: "6px 0 4px" }}>Quality:</p>
+                <Btn options={["Restless", "Normal", "Deep"]} value={form.sleepType} onChange={(v) => setForm({ ...form, sleepType: v })} />
+              </Section>
+
+              <Section title={⚡ Energy: ${form.energy}/10} bg="#fffbeb">
+                <input type="range" min="0" max="10" value={form.energy} onChange={(e) => setForm({ ...form, energy: parseInt(e.target.value || "0") })} style={{ width: "100%" }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <input type="checkbox" checked={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.checked })} />
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>Exercised</span>
+                </label>
+                {form.exercise && <Btn options={["Yoga", "Walking", "Running", "Strength"]} value={form.exerciseType} onChange={(v) => setForm({ ...form, exerciseType: v })} multi />}
+              </Section>
+
+              <Section title="🍎 Nutrition" bg="#f0fdf4">
+                <p style={{ fontSize: 12, marginBottom: 6 }}>Appetite:</p>
+                <Btn options={["Low", "Normal", "High"]} value={form.appetite} onChange={(v) => setForm({ ...form, appetite: v })} />
+                <p style={{ fontSize: 12, marginTop: 8 }}>Cravings:</p>
+                <Btn options={["Sweet", "Salty", "Spicy", "None"]} value={form.cravings} onChange={(v) => setForm({ ...form, cravings: v })} multi />
+              </Section>
+
+              <Section title="💩 Digestion" bg="#ecfdf5">
+                <p style={{ fontSize: 12, marginBottom: 6 }}>Overall:</p>
+                <Btn options={["Normal", "Gas", "Acidity", "Constipation", "Diarrhea", "Bloated"]} value={form.digestion} onChange={(v) => setForm({ ...form, digestion: v })} />
+                <p style={{ fontSize: 12, marginTop: 8 }}>Bowel movement:</p>
+                <Btn options={["Regular", "Irregular", "None today"]} value={form.bowelMovement} onChange={(v) => setForm({ ...form, bowelMovement: v })} />
+              </Section>
+
+              <Section title="✨ Skin & Hair" bg="#fef3c7">
+                <p style={{ fontSize: 12, marginBottom: 6 }}>Skin:</p>
+                <Btn options={["Normal", "Oily", "Dry", "Acne", "Rash", "Glowing"]} value={form.skin} onChange={(v) => setForm({ ...form, skin: v })} />
+                <p style={{ fontSize: 12, marginTop: 8 }}>Hair:</p>
+                <Btn options={["Normal", "Oily", "Dry", "Hair fall", "Brittle", "Healthy"]} value={form.hair} onChange={(v) => setForm({ ...form, hair: v })} />
+              </Section>
+
+              <Section title="❤ Sexual Health (optional)" bg="#fce7f3">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={form.sexActivity} onChange={(e) => setForm({ ...form, sexActivity: e.target.checked })} />
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>Sexual activity</span>
+                </label>
+                {form.sexActivity && (
+                  <>
+                    <Btn options={["Protected", "Unprotected"]} value={form.protection} onChange={(v) => setForm({ ...form, protection: v })} />
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <input type="checkbox" checked={form.sexPain} onChange={(e) => setForm({ ...form, sexPain: e.target.checked })} />
+                      <span style={{ fontSize: 12 }}>Pain/discomfort during sex</span>
+                    </label>
+                  </>
+                )}
+                <p style={{ fontSize: 12, marginTop: 8 }}>Sex drive:</p>
+                <Btn options={["Low", "Normal", "High", "None"]} value={form.sexDrive} onChange={(v) => setForm({ ...form, sexDrive: v })} />
+              </Section>
+
+              <Section title="📝 Notes" bg="#f9fafb">
+                <p style={{ fontSize: 12, marginBottom: 6 }}>Health conditions:</p>
+                <Btn options={["PCOS", "Endometriosis", "Thyroid", "Diabetes", "Anemia", "Migraines", "None"]} value={form.ailments} onChange={(v) => setForm({ ...form, ailments: v })} multi />
+                <p style={{ fontSize: 12, margin: "8px 0 4px" }}>Medical tests/appointments:</p>
+                <input type="text" placeholder="e.g. Blood test, ultrasound" value={form.medicalTests} onChange={(e) => setForm({ ...form, medicalTests: e.target.value })} style={{ width: "100%", padding: 8, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13 }} />
+                <p style={{ fontSize: 12, marginTop: 8 }}>Additional notes:</p>
+                <textarea placeholder="How are you feeling?" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} style={{ width: "100%", padding: 8, border: "1px solid #e5e7eb", borderRadius: 8, minHeight: 70, fontSize: 13 }} />
+              </Section>
+
+              <button onClick={saveEntry} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "linear-gradient(135deg,#ec4899,#8b5cf6)", color: "white", fontWeight: 800, fontSize: 14, cursor: "pointer", marginTop: 8 }}>
+                ✓ Save Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {expandedBlog && view !== "learn" && (
+        <div onClick={() => setExpandedBlog(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, maxWidth: 480, padding: 20, maxHeight: "80vh", overflowY: "auto" }}>
+            <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{expandedBlog.title}</p>
+            <p style={{ fontSize: 13, lineHeight: 1.6, color: "#374151" }}>{expandedBlog.content}</p>
+            <button onClick={() => setExpandedBlog(null)} style={{ width: "100%", padding: 10, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ec4899,#8b5cf6)", color: "white", fontWeight: 800, marginTop: 12, cursor: "pointer", fontSize: 13 }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
